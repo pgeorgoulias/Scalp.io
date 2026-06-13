@@ -86,8 +86,11 @@ PRODUCTS = [
     
 ]
 
-CHECK_INTERVAL = 300  # seconds
+CHECK_INTERVAL = 60  # seconds
 NOTIFICATION_INTERVAL = 3600  # seconds (1 hour)
+# Track last browser restart time
+last_browser_restart = time.time()
+BROWSER_RESTART_INTERVAL = 60  #in seconds
 
 # Discord settings
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1514971520185667594/NfViZZ458kx8yI7xN_JunaufXV1CdACp6M5r_9Ly6D5OlQSzoyi1MNPrhKWrZLi8fYMd"
@@ -131,9 +134,6 @@ def send_discord_file(file_path: str, filename: str, product_name: str):
     except Exception as e:
         print(f"Failed to send Discord file: {e}")
 
-MAX_CONCURRENT = 4
-semaphore = asyncio.Semaphore(MAX_CONCURRENT)
-
 async def check_stock(page, product_url: str, product_name: str = "Unknown Product") -> bool:
     try:
         user_agent = get_random_user_agent()
@@ -154,51 +154,53 @@ async def check_stock(page, product_url: str, product_name: str = "Unknown Produ
         return False
 
 async def monitor_products():
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        pages = [await browser.new_page() for _ in PRODUCTS]
+    global last_browser_restart
 
-        print(f"Starting parallel monitoring for {len(PRODUCTS)} products every {CHECK_INTERVAL} seconds")
+    while True:
+        # Check if it's time to restart the browser
+        current_time = time.time()
+        if current_time - last_browser_restart >= BROWSER_RESTART_INTERVAL:
+            print("\n--- Restarting browser to prevent memory leaks ---")
+            last_browser_restart = current_time
 
-        while True:
-            tasks = []
-            for i, product in enumerate(PRODUCTS):
-                product_name = product.get("name", "Unknown Product")
-                product_url = product["url"]
-                print(f"\nChecking: {product_name}")
-                # Pass product_name to check_stock
-                tasks.append(check_stock(pages[i], product_url, product_name))
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            page = await browser.new_page()  # Single page for sequential checks
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            print(f"Starting sequential monitoring for {len(PRODUCTS)} products every {CHECK_INTERVAL} seconds")
 
-            for i, result in enumerate(results):
-                product = PRODUCTS[i]
-                product_name = product.get("name", "Unknown Product")
-                product_url = product["url"]
+            while True:
+                # Check if it's time to restart the browser again
+                if time.time() - last_browser_restart >= BROWSER_RESTART_INTERVAL:
+                    break
 
-                if isinstance(result, Exception):
-                    print(f"Error checking {product_name}: {result}")
-                    continue
+                for product in PRODUCTS:
+                    product_name = product.get("name", "Unknown Product")
+                    product_url = product["url"]
+                    print(f"\nChecking: {product_name}")
 
-                if result:
-                    current_time = time.time()
-                    if product_name not in last_notification or (current_time - last_notification[product_name] >= NOTIFICATION_INTERVAL):
-                        print(f"STOCK DETECTED: {product_name}")
-                        screenshot_path = f"stock_detected_{product_name.replace(' ', '_')}.png"
-                        await pages[i].screenshot(
-                            path=screenshot_path,
-                            full_page=True,
-                        )
-                        send_discord_notification(product_name, product_url)
-                        send_discord_file(screenshot_path, f"stock_{product_name.replace(' ', '_')}.png", product_name)
-                        last_notification[product_name] = current_time
-                    else:
-                        print(f"Notification for {product_name} was already sent recently. Skipping.")
+                    in_stock = await check_stock(page, product_url, product_name)
 
-            print(f"\nWaiting {CHECK_INTERVAL} seconds before next check...")
-            await asyncio.sleep(CHECK_INTERVAL)
+                    if in_stock:
+                        current_time = time.time()
+                        if product_name not in last_notification or (current_time - last_notification[product_name] >= NOTIFICATION_INTERVAL):
+                            print(f"STOCK DETECTED: {product_name}")
+                            screenshot_path = f"stock_detected_{product_name.replace(' ', '_')}.png"
+                            await page.screenshot(
+                                path=screenshot_path,
+                                full_page=True,
+                            )
+                            send_discord_notification(product_name, product_url)
+                            send_discord_file(screenshot_path, f"stock_{product_name.replace(' ', '_')}.png", product_name)
+                            last_notification[product_name] = current_time
+                        else:
+                            print(f"Notification for {product_name} was already sent recently. Skipping.")
 
-        await browser.close()
+                print(f"\nWaiting {CHECK_INTERVAL} seconds before next check...")
+                await asyncio.sleep(CHECK_INTERVAL)
+
+            # Close the browser before restarting
+            await browser.close()
 
 if __name__ == "__main__":
     asyncio.run(monitor_products())
