@@ -131,7 +131,10 @@ def send_discord_file(file_path: str, filename: str, product_name: str):
     except Exception as e:
         print(f"Failed to send Discord file: {e}")
 
-async def check_stock(page, product_url: str) -> bool:
+MAX_CONCURRENT = 4
+semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+async def check_stock(page, product_url: str, product_name: str = "Unknown Product") -> bool:
     try:
         user_agent = get_random_user_agent()
         await page.set_extra_http_headers({"User-Agent": user_agent})
@@ -139,52 +142,58 @@ async def check_stock(page, product_url: str) -> bool:
         button = page.locator('[data-testid="btn-add-to-cart"]')
 
         if await button.count() == 0:
-            print(f"Button not found for {product_url}")
+            print(f"Button not found for {product_name} ({product_url})")
             return False
 
         enabled = await button.is_enabled()
-        print(f"Button enabled for {product_url}: {enabled}")
+        print(f"Button enabled for {product_name}: {enabled}")
         return enabled
 
     except Exception as e:
-        print(f"Error checking {product_url}: {e}")
+        print(f"Error checking {product_name} ({product_url}): {e}")
         return False
 
 async def monitor_products():
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        pages = [await browser.new_page() for _ in PRODUCTS]
 
-        print(f"Starting monitoring for {len(PRODUCTS)} products every {CHECK_INTERVAL} seconds")
+        print(f"Starting parallel monitoring for {len(PRODUCTS)} products every {CHECK_INTERVAL} seconds")
 
         while True:
-            for product in PRODUCTS:
+            tasks = []
+            for i, product in enumerate(PRODUCTS):
+                product_name = product.get("name", "Unknown Product")
+                product_url = product["url"]
+                print(f"\nChecking: {product_name}")
+                # Pass product_name to check_stock
+                tasks.append(check_stock(pages[i], product_url, product_name))
+
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            for i, result in enumerate(results):
+                product = PRODUCTS[i]
                 product_name = product.get("name", "Unknown Product")
                 product_url = product["url"]
 
-                print(f"\nChecking: {product_name}")
-                try:
-                    available = await check_stock(page, product_url)
+                if isinstance(result, Exception):
+                    print(f"Error checking {product_name}: {result}")
+                    continue
 
-                    if available:
-                        current_time = time.time()
-                        # Check if notification was sent recently
-                        if product_name not in last_notification or (current_time - last_notification[product_name] >= NOTIFICATION_INTERVAL):
-                            print(f"STOCK DETECTED: {product_name}")
-                            screenshot_path = f"stock_detected_{product_name.replace(' ', '_')}.png"
-                            await page.screenshot(
-                                path=screenshot_path,
-                                full_page=True,
-                            )
-                            send_discord_notification(product_name, product_url)
-                            send_discord_file(screenshot_path, f"stock_{product_name.replace(' ', '_')}.png", product_name)
-                            # Update last notification time
-                            last_notification[product_name] = current_time
-                        else:
-                            print(f"Notification for {product_name} was already sent recently. Skipping.")
-
-                except Exception as e:
-                    print(f"Unexpected error with {product_name}: {e}")
+                if result:
+                    current_time = time.time()
+                    if product_name not in last_notification or (current_time - last_notification[product_name] >= NOTIFICATION_INTERVAL):
+                        print(f"STOCK DETECTED: {product_name}")
+                        screenshot_path = f"stock_detected_{product_name.replace(' ', '_')}.png"
+                        await pages[i].screenshot(
+                            path=screenshot_path,
+                            full_page=True,
+                        )
+                        send_discord_notification(product_name, product_url)
+                        send_discord_file(screenshot_path, f"stock_{product_name.replace(' ', '_')}.png", product_name)
+                        last_notification[product_name] = current_time
+                    else:
+                        print(f"Notification for {product_name} was already sent recently. Skipping.")
 
             print(f"\nWaiting {CHECK_INTERVAL} seconds before next check...")
             await asyncio.sleep(CHECK_INTERVAL)
