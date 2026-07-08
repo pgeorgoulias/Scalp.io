@@ -19,14 +19,20 @@ PRODUCT_STOCK_URL = "https://www.public.gr/public/v1/mm/productPage"
 STORE_AVAILABILITY_URL = "https://www.public.gr/public/v1/mm/stores"
 STATE_FILE = Path(__file__).with_name("public_product_state.json")
 SECRETS_FILE = Path(__file__).with_name("secrets.json")
+CONFIG_FILE = Path(__file__).with_name("public_monitor_config.json")
 LOCAL_TIMEZONE = ZoneInfo("Europe/Athens")
 
-CHECK_INTERVAL = 5  # seconds between full catalog scans
-CHECK_INTERVAL_JITTER = 3  # extra random seconds between scans
+CHECK_INTERVAL = 5  # seconds between monitor cycles
+CHECK_INTERVAL_JITTER = 3  # extra random seconds between cycles
 PRODUCT_CHECK_DELAY = 10  # seconds between sequential product API checks
 WATCHLIST_CHECK_INTERVAL = 20  # seconds between direct checks of known product URLs
+SHALLOW_LISTING_SCAN_INTERVAL = 180  # seconds between first-page listing scans
+DEEP_LISTING_SCAN_INTERVAL = 900  # seconds between full listing scans
+LISTING_BACKOFF_INITIAL = 300  # seconds to pause listing scans after a failure
+LISTING_BACKOFF_MAX = 3600  # maximum seconds to pause listing scans after repeated failures
 LISTING_ACTION_DELAY = 2  # seconds after scrolling/clicking listing controls
 FULL_VERIFY_INTERVAL = 3600  # seconds between slow safety checks of every product
+SHALLOW_LISTING_PAGES = 3
 MAX_LISTING_PAGES = 20
 MAX_EXPAND_CLICKS = 20
 FIRST_RUN_NOTIFY = False
@@ -40,6 +46,68 @@ PRODUCT_LINK_SELECTOR = 'a[href*="/product/"]'
 BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 STORE_ONLY_TEXT = "Αγορά μόνο από κατάστημα"
 TARGET_STORE_AREA = "Athens"
+
+CONFIG_SETTING_MAP = {
+    "search_url": "SEARCH_URL",
+    "check_interval": "CHECK_INTERVAL",
+    "check_interval_jitter": "CHECK_INTERVAL_JITTER",
+    "product_check_delay": "PRODUCT_CHECK_DELAY",
+    "watchlist_check_interval": "WATCHLIST_CHECK_INTERVAL",
+    "shallow_listing_scan_interval": "SHALLOW_LISTING_SCAN_INTERVAL",
+    "deep_listing_scan_interval": "DEEP_LISTING_SCAN_INTERVAL",
+    "listing_backoff_initial": "LISTING_BACKOFF_INITIAL",
+    "listing_backoff_max": "LISTING_BACKOFF_MAX",
+    "listing_action_delay": "LISTING_ACTION_DELAY",
+    "full_verify_interval": "FULL_VERIFY_INTERVAL",
+    "shallow_listing_pages": "SHALLOW_LISTING_PAGES",
+    "max_listing_pages": "MAX_LISTING_PAGES",
+    "max_expand_clicks": "MAX_EXPAND_CLICKS",
+    "first_run_notify": "FIRST_RUN_NOTIFY",
+    "discord_timeout": "DISCORD_TIMEOUT",
+    "api_timeout": "API_TIMEOUT",
+    "store_availability_timeout": "STORE_AVAILABILITY_TIMEOUT",
+    "page_load_timeout": "PAGE_LOAD_TIMEOUT",
+    "selector_wait_timeout": "SELECTOR_WAIT_TIMEOUT",
+    "target_store_area": "TARGET_STORE_AREA",
+}
+
+
+def load_monitor_config():
+    if not CONFIG_FILE.exists():
+        return {}
+
+    try:
+        with CONFIG_FILE.open("r", encoding="utf-8") as config_file:
+            config = json.load(config_file)
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"Could not read config file. Using built-in settings: {e}")
+        return {}
+
+    if not isinstance(config, dict):
+        print("Config file root must be a JSON object. Using built-in settings.")
+        return {}
+
+    return config
+
+
+def apply_monitor_config(config):
+    settings = config.get("settings") if isinstance(config.get("settings"), dict) else {}
+    for setting_name, global_name in CONFIG_SETTING_MAP.items():
+        if setting_name in settings:
+            globals()[global_name] = settings[setting_name]
+
+    products = config.get("watchlist_products")
+    if isinstance(products, list):
+        globals()["WATCHLIST_PRODUCTS"] = [
+            product for product in products
+            if isinstance(product, dict) and product.get("url")
+        ]
+
+    return config
+
+
+def reload_monitor_config():
+    return apply_monitor_config(load_monitor_config())
 
 WATCHLIST_PRODUCTS = [
         {
@@ -65,6 +133,10 @@ WATCHLIST_PRODUCTS = [
     {
         "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokemon-kartes-sv85-prismatic-evolutions-tech-sticker-collection/1996522",
         "name": "Prismatic Evolutions Tech Sticker Collection"
+    },
+    {
+        "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokemon-kartes-sv85-prismatic-evolutions-elite-trainer-box/1996524",
+        "name": "Prismatic Evolutions Elite Trainer Box"
     },
     {
         "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet--destined-rivals-booster/2033114",
@@ -135,6 +207,8 @@ WATCHLIST_PRODUCTS = [
         "name": "Ascended Heroes Deluxe Pin Collection"
     },
 ]
+
+reload_monitor_config()
 
 ADD_TO_CART_SELECTORS = [
     '[data-testid="btn-add-to-cart"]',
@@ -292,30 +366,112 @@ def normalize_watchlist_product(product):
     }
 
 
-def merge_listing_and_watchlist_products(listing_products):
-    products_by_url = {}
-
-    for product in listing_products:
-        products_by_url[product["url"]] = {
-            **product,
-            "watchlist": False,
-        }
-
-    for watchlist_product in WATCHLIST_PRODUCTS:
-        product = normalize_watchlist_product(watchlist_product)
-        if not product:
+def state_products_for_fast_cycle(state):
+    products = []
+    for product_url, saved_product in state.get("products", {}).items():
+        if saved_product.get("watchlist"):
             continue
 
-        existing = products_by_url.get(product["url"])
-        if existing:
-            products_by_url[product["url"]] = {
-                **existing,
-                "watchlist": True,
-            }
-        else:
-            products_by_url[product["url"]] = product
+        normalized_url = normalize_product_url(saved_product.get("url") or product_url)
+        if not normalized_url:
+            continue
+
+        products.append({
+            "name": saved_product.get("name") or product_name_from_url(normalized_url),
+            "url": normalized_url,
+            "listing_text": saved_product.get("listing_text") or "Previously discovered listing product",
+            "listing_hash": saved_product.get("listing_hash") or fingerprint_text(normalized_url),
+            "watchlist": False,
+        })
+
+    return products
+
+
+def merge_products(*product_groups):
+    products_by_url = {}
+
+    for product_group in product_groups:
+        for product in product_group:
+            if not product:
+                continue
+
+            existing = products_by_url.get(product["url"])
+            if existing:
+                products_by_url[product["url"]] = {
+                    **existing,
+                    **product,
+                    "watchlist": existing.get("watchlist", False) or product.get("watchlist", False),
+                }
+            else:
+                products_by_url[product["url"]] = product
 
     return list(products_by_url.values())
+
+
+def watchlist_products():
+    return [
+        product
+        for product in (normalize_watchlist_product(product) for product in WATCHLIST_PRODUCTS)
+        if product
+    ]
+
+
+class MonitorScheduler:
+    def __init__(self, state):
+        self.state = state
+
+    def listing_backoff_until(self):
+        return self.state.get("listing_backoff_until", 0)
+
+    def listing_backoff_remaining(self, now):
+        return max(0, self.listing_backoff_until() - now)
+
+    def due_listing_scan(self, now):
+        if now < self.listing_backoff_until():
+            return None
+
+        last_deep_scan = self.state.get("last_deep_listing_scan", 0)
+        if now - last_deep_scan >= DEEP_LISTING_SCAN_INTERVAL:
+            return {
+                "name": "deep",
+                "max_pages": MAX_LISTING_PAGES,
+                "last_scan_key": "last_deep_listing_scan",
+            }
+
+        last_shallow_scan = self.state.get("last_shallow_listing_scan", 0)
+        if now - last_shallow_scan >= SHALLOW_LISTING_SCAN_INTERVAL:
+            return {
+                "name": "shallow",
+                "max_pages": SHALLOW_LISTING_PAGES,
+                "last_scan_key": "last_shallow_listing_scan",
+            }
+
+        return None
+
+    def seconds_until_next_listing_scan(self, now):
+        if now < self.listing_backoff_until():
+            return self.listing_backoff_remaining(now)
+
+        next_shallow_scan = self.state.get("last_shallow_listing_scan", 0) + SHALLOW_LISTING_SCAN_INTERVAL
+        next_deep_scan = self.state.get("last_deep_listing_scan", 0) + DEEP_LISTING_SCAN_INTERVAL
+        return max(0, min(next_shallow_scan, next_deep_scan) - now)
+
+    def record_listing_success(self, scan, now):
+        self.state[scan["last_scan_key"]] = now
+        self.state["last_listing_scan"] = now
+        self.state["listing_failures"] = 0
+        self.state.pop("listing_backoff_until", None)
+
+        if scan["name"] == "deep":
+            self.state["last_shallow_listing_scan"] = now
+
+    def record_listing_failure(self, now):
+        failures = self.state.get("listing_failures", 0) + 1
+        self.state["listing_failures"] = failures
+        backoff_seconds = min(LISTING_BACKOFF_INITIAL * (2 ** (failures - 1)), LISTING_BACKOFF_MAX)
+        jitter = random.uniform(0, min(60, backoff_seconds * 0.2))
+        self.state["listing_backoff_until"] = int(now + backoff_seconds + jitter)
+        return backoff_seconds
 
 
 def format_found_time(timestamp):
@@ -514,7 +670,7 @@ def go_to_next_listing_page(page):
     return page.url != old_url or new_products != old_products
 
 
-def discover_products(page):
+def discover_products(page, max_pages=MAX_LISTING_PAGES):
     products_by_url = {}
     visited_listing_pages = set()
 
@@ -523,7 +679,7 @@ def discover_products(page):
     wait_for_any_selector(page, [PRODUCT_LINK_SELECTOR], SELECTOR_WAIT_TIMEOUT)
     accept_cookies_if_present(page)
 
-    for page_number in range(1, MAX_LISTING_PAGES + 1):
+    for page_number in range(1, max_pages + 1):
         current_url = page.url
         if current_url in visited_listing_pages:
             break
@@ -948,6 +1104,7 @@ def handle_product_change(product, previous, details, first_run, found_at):
 
 def monitor_products():
     state = load_state()
+    scheduler = MonitorScheduler(state)
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
@@ -956,13 +1113,45 @@ def monitor_products():
         listing_page = context.new_page()
 
         while True:
+            reload_monitor_config()
             scan_started_at = int(time.time())
             first_run = len(state["products"]) == 0
             previous_products = state["products"].copy()
 
             try:
-                listing_products = discover_products(listing_page)
-                products = merge_listing_and_watchlist_products(listing_products)
+                listing_products = []
+                listing_scan = scheduler.due_listing_scan(scan_started_at)
+                if listing_scan:
+                    try:
+                        print(
+                            f"Running {listing_scan['name']} listing scan "
+                            f"({listing_scan['max_pages']} page limit)."
+                        )
+                        listing_products = discover_products(
+                            listing_page,
+                            max_pages=listing_scan["max_pages"],
+                        )
+                        scheduler.record_listing_success(listing_scan, scan_started_at)
+                    except Exception as e:
+                        backoff_seconds = scheduler.record_listing_failure(scan_started_at)
+                        print(
+                            f"Listing scan failed: {e}. "
+                            f"Backing off listing scans for about {int(backoff_seconds)} seconds."
+                        )
+                        try:
+                            listing_page.close()
+                        except Exception:
+                            pass
+                        listing_page = context.new_page()
+                else:
+                    wait_for_listing = scheduler.seconds_until_next_listing_scan(scan_started_at)
+                    print(f"Skipping listing scan. Next listing scan in {int(wait_for_listing)} seconds.")
+
+                products = merge_products(
+                    watchlist_products(),
+                    state_products_for_fast_cycle(state),
+                    listing_products,
+                )
                 products_to_verify = []
 
                 for product in products:
@@ -983,9 +1172,9 @@ def monitor_products():
                 save_state(state)
 
                 print(
-                    f"Discovered {len(listing_products)} listing products and "
-                    f"{len(WATCHLIST_PRODUCTS)} watchlist products. "
-                    f"Checking {len(products_to_verify)} new/changed products."
+                    f"Discovered {len(listing_products)} listing products this cycle and "
+                    f"tracking {len(WATCHLIST_PRODUCTS)} watchlist products. "
+                    f"Checking {len(products_to_verify)} due products."
                 )
 
                 for product in products_to_verify:
@@ -1033,7 +1222,7 @@ def monitor_products():
                 listing_page = context.new_page()
 
             wait_seconds = CHECK_INTERVAL + random.uniform(0, CHECK_INTERVAL_JITTER)
-            print(f"\nWaiting {wait_seconds:.1f} seconds before next catalog scan...")
+            print(f"\nWaiting {wait_seconds:.1f} seconds before next monitor cycle...")
             time.sleep(wait_seconds)
 
 

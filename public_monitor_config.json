@@ -1,0 +1,123 @@
+{
+  "settings": {
+    "search_url": "https://www.public.gr/search?q=pokemon%20tcg",
+    "check_interval": 5,
+    "check_interval_jitter": 3,
+    "product_check_delay": 10,
+    "watchlist_check_interval": 15,
+    "shallow_listing_scan_interval": 150,
+    "deep_listing_scan_interval": 600,
+    "listing_backoff_initial": 300,
+    "listing_backoff_max": 3600,
+    "listing_action_delay": 2,
+    "full_verify_interval": 3600,
+    "shallow_listing_pages": 3,
+    "max_listing_pages": 20,
+    "max_expand_clicks": 20,
+    "first_run_notify": false,
+    "discord_timeout": 5,
+    "api_timeout": 10,
+    "store_availability_timeout": 10,
+    "page_load_timeout": 30000,
+    "selector_wait_timeout": 8000,
+    "target_store_area": "Athens"
+  },
+  "watchlist_products": [
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-tech-sticker-collection--tuxaia-epilogi-sxediou/2104845",
+      "name": "Ascended Heroes 2.5 Tech Sticker Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-elite-trainer-box/2111316",
+      "name": "Ascended Heroes 2.5 Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution-elite-trainer-box-1-tmx--tuxaia-epilogi-sxediou/2088741",
+      "name": "Mega Evolution Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-85-prismatic-evolutions-premium-figure-collection/2094853",
+      "name": "Prismatic Evolutions Premium Figure Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/kaissa-pokemon-sv85-prismatic-evolutions-surprise-box-collection/1996547",
+      "name": "Prismatic Evolutions Surprise Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokemon-kartes-sv85-prismatic-evolutions-tech-sticker-collection/1996522",
+      "name": "Prismatic Evolutions Tech Sticker Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokemon-kartes-sv85-prismatic-evolutions-elite-trainer-box/1996524",
+      "name": "Prismatic Evolutions Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet--destined-rivals-booster/2033114",
+      "name": "Pokémon TCG: Scarlet & Violet - Destined Rivals Booster"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet--prismatic-evolutions-accessory-pouch-special-collection/2033109",
+      "name": "Prismatic Evolutions Accessory Pouch"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokemon-kartes-sv85-prismatic-evolutions-binder-collection/1996523",
+      "name": "Prismatic Evolutions Binder Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-2-pack-blister-collection--tuxaia-epilogi-sxediou/2104846",
+      "name": "Ascended Heroes 2.5 2 Pack Blister Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-105-black-bolt-elite-trainer-box/2060939",
+      "name": "Black Bolt Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--phantasmal-flames-elite-trainer-box/2094847",
+      "name": "Phantasmal Flames Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-105-black-bolt-booster-bundle/2060949",
+      "name": "Black Bolt Booster Bundle"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-illustrationcollectionseries1/2121163",
+      "name": "Illustration Collection Series 1"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-mini-tin/2111315",
+      "name": "Ascended Heroes 2.5 Mini Tin"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/ascendedheroespostercollection-kaissa-me25/2121162",
+      "name": "Ascended Heroes Poster Collection"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-105-black-bolt-white-flare-unova-victini-illustratation-collection/2060946",
+      "name": "Black Bolt & White Flare Unova Victini Illustratation"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-booster-bundle/2132001",
+      "name": "Ascended Heroes Booster Bundle"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--ascended-heroes-25-mega-meganium-exmega-emboar-exmega-feraligatr-ex--tuxaia-epilogi/2132002",
+      "name": "Ascended Heroes 2.5 Mega Meganium ex/Mega Emboar ex/Mega Feraligatr ex"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-mega-evolution--phantasmal-flames-booster-1-fakelaki--tuxaia-epilogi-sxediou/2094845",
+      "name": "Phantasmal Flames Booster"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-105-white-flare-booster-bundle/2060948",
+      "name": "White Flare Booster Bundle"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcg-scarlet-violet-105-white-flare-elite-trainer-box/2060940",
+      "name": "White Flare Elite Trainer Box"
+    },
+    {
+      "url": "https://www.public.gr/product/kids-and-toys/trading-collectable-cards/pokmon-tcgascendedheroesdeluxepincollection-me25/2121164",
+      "name": "Ascended Heroes Deluxe Pin Collection"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Public Monitor HUD</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <canvas id="hud-canvas" aria-hidden="true"></canvas>
+  <div class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">COMMAND CENTER</p>
+        <h1>Scalper Jarvis</h1>
+      </div>
+      <div class="status-cluster">
+        <div class="status-pill" id="monitor-status">OFFLINE</div>
+        <button class="icon-button" id="refresh-button" title="Refresh data">⟳</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel command-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Command</p>
+            <h2>Monitor Control</h2>
+          </div>
+          <div class="ring" id="availability-ring"><span id="available-count">0</span></div>
+        </div>
+        <div class="control-row">
+          <button class="primary" id="start-button">Start Monitor</button>
+          <button class="danger" id="stop-button">Stop</button>
+          <button id="save-button">Save Config</button>
+        </div>
+        <div class="metric-grid">
+          <div class="metric"><span>Tracked</span><strong id="tracked-count">0</strong></div>
+          <div class="metric"><span>Available</span><strong id="available-metric">0</strong></div>
+          <div class="metric"><span>PID</span><strong id="pid-value">—</strong></div>
+          <div class="metric"><span>Started</span><strong id="started-value">—</strong></div>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="eyebrow">Scheduler</p>
+            <h2>Timing Matrix</h2>
+          </div>
+        </div>
+        <div class="settings-grid" id="settings-grid"></div>
+      </section>
+
+      <section class="panel products-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Watchlist</p>
+            <h2>Product Targets</h2>
+          </div>
+          <button id="add-product-button">Add Product</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Name</th><th>Public URL</th><th>SKU</th><th></th></tr>
+            </thead>
+            <tbody id="products-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel state-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="eyebrow">Telemetry</p>
+            <h2>Known Availability</h2>
+          </div>
+        </div>
+        <div class="state-list" id="state-list"></div>
+      </section>
+
+      <section class="panel logs-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="eyebrow">Runtime</p>
+            <h2>Console Stream</h2>
+          </div>
+        </div>
+        <pre id="logs"></pre>
+      </section>
+    </main>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
